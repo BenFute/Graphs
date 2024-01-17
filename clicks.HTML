@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Click and Draw Circles</title>
+</head>
+<body>
+    <canvas id="circleCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+
+    <script>
+        var canvas = document.getElementById("circleCanvas");
+        var ctx = canvas.getContext("2d");
+
+        var clickLocations = [];
+
+        canvas.addEventListener('click', function (event) {
+            var rect = canvas.getBoundingClientRect();
+            var mouseX = event.clientX - rect.left;
+            var mouseY = event.clientY - rect.top;
+
+            var newCircle = {
+                x: mouseX,
+                y: mouseY,
+                radius: 20 // Adjust the radius as needed
+            };
+
+            clickLocations.push(newCircle);
+            drawCircles();
+        });
+
+        function drawCircle(circle) {
+            ctx.beginPath();
+            ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        function drawCircles() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw all circles in the array
+            clickLocations.forEach(function(circle) {
+                drawCircle(circle);
+            });
+        }
+    </script>
+</body>
+</html>

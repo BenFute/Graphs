@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vertex Connection</title>
+</head>
+<body>
+    <canvas id="vertexCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+    <label for="verticesInput">Enter vertices (comma-separated): </label>
+    <input type="text" id="verticesInput" placeholder="e.g., 1,2,3,4,5,6">
+    <button onclick="drawVertices()">Draw Vertices</button>
+
+    <script>
+        function drawVertices() {
+            var canvas = document.getElementById("vertexCanvas");
+            var ctx = canvas.getContext("2d");
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            var verticesInput = document.getElementById("verticesInput").value;
+            var vertices = verticesInput.split(',').map(Number);
+
+            // Draw vertices
+            for (var i = 0; i < vertices.length; i++) {
+                var x = 50 + i * 50;
+                var y = 50;
+
+                // Draw vertex with label
+                ctx.beginPath();
+                ctx.arc(x, y, 15, 0, 2 * Math.PI);
+                ctx.strokeStyle = "red";
+                ctx.stroke();
+                ctx.closePath();
+                ctx.font = "12px Arial";
+                ctx.fillStyle = "red";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(vertices[i].toString(), x, y);
+            }
+
+            // Connect vertices with lines
+            ctx.beginPath();
+            ctx.moveTo(50, 50);
+            for (var i = 1; i < vertices.length; i++) {
+                var x = 50 + i * 50;
+                ctx.lineTo(x, 50);
+            }
+            ctx.strokeStyle = "green";
+            ctx.stroke();
+            ctx.closePath();
+        }
+    </script>
+</body>
+</html>

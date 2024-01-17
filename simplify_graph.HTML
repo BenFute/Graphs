@@ -1,0 +1,454 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph</title>
+    <style>
+        .buttonOn {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <form id="graphForm">
+        <label for="numLabels">Number of Labels:</label>
+        <input type="number" id="numLabels" name="numLabels" min="1" value="4">
+
+        <label for="numEdges">Number of Edges:</label>
+        <input type="number" id="numEdges" name="numEdges" min="1" value="6">
+
+        <button type="button" onclick="generateLabelsAndEdgesFromForm()">Generate Random Graph</button>
+    </form>
+
+    
+    <form id="graphFormManual">
+        <label for="labels">Enter Labels:</label>
+        <input type="text" id="labelInput" name="labelInput" value="1,2,3,4">
+
+        <label for="edges">Enter Edges:</label>
+        <input type="text" id="edgeInput" name="edgeInput" value="1,2;1,2;2,3;3,4;4,1">
+
+        <button type="button" onclick="generateGraphFromForm()">Generate Graph</button> 
+        
+    </form>
+    <button type="button" id="freeDrawButton" onclick="drawVertices()">Draw Vertices</button>
+    <button type="button"id="connectVerticesButton" onclick="connectVerticesButton()">Connect Vertices</button>
+    <br>
+
+
+
+
+    <canvas id="graphCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+    <br>
+    <button type="button" onclick="autoDraw()">Auto Draw</button>
+    <br>
+    <button type="button" onclick="resetDraw()">Reset Drawing</button>
+    <button type="button" onclick="resetGraph()">Reset Graph</button>
+    <div id="graphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+    <button type="button" onclick="simplifyEdges()">Simplify Edges</button>
+
+    <script>
+        var canvas = document.getElementById("graphCanvas");
+        var ctx = canvas.getContext("2d");
+
+        var labels = [];
+        var edges = [];
+        var points = [];
+        var clicks = [];
+        var selectedLabels = []
+
+        var freeDraw = false;
+        var connectVertices = false;
+        var graphReady = false;
+
+        //Convert labels to points for drawing.
+        canvas.addEventListener('click', function(event) {
+            var rect = canvas.getBoundingClientRect();
+            var mouseX = event.clientX - rect.left;
+            var mouseY = event.clientY - rect.top;
+
+            if(connectVertices){
+                for (const point of points) {
+                    if (isPointClicked(mouseX, mouseY, point)) {
+
+                        selectedLabels.push(point.label);
+                        console.log("selectedLabels: " + selectedLabels);
+
+                        if(selectedLabels.length == 2){
+                            var newEdge = [selectedLabels[0], selectedLabels[1]];
+                            edges.push(newEdge);
+                            selectedLabels = [];
+                            console.log("edges: " + edges);
+                        }
+                        updateGraphInfo();
+                        drawGraph();
+                    
+                    }
+                }
+            }
+
+            if(freeDraw){
+                console.log("freeDraw");
+
+                var newClick = { x: mouseX, 
+                                y: mouseY };
+                clicks.push(newClick);
+
+                labels = [];
+                for( var i = 0; i < clicks.length; i++){
+                    labels.push(i.toString());
+                    }
+                
+
+                drawGraph();
+                updateGraphInfo();
+            } else if (graphReady){
+                console.log("draw");
+                var rect = canvas.getBoundingClientRect();
+
+                var newClick = { x: mouseX, 
+                                y: mouseY };
+                clicks.push(newClick);
+                drawGraph();
+            }
+        });
+
+        function isPointClicked(mouseX, mouseY, point) {
+            var distance = Math.sqrt((mouseX - point.x) ** 2 + (mouseY - point.y) ** 2);
+            return distance <= 30; // Radius of the circle
+        }
+
+        function drawVertices(){
+            toggleFreeDrawButton();
+
+            console.log("drawVertices");
+            console.log("clicks" + clicks);
+
+
+            //drawGraph();
+        }
+
+        function toggleFreeDrawButton(){
+            var button = document.getElementById("freeDrawButton");
+
+            if(connectVertices){
+                toggleConnectVerticesButton();
+            }
+
+
+            if(freeDraw){
+                button.classList.remove("buttonOn");
+            } else {
+                button.classList.add("buttonOn");
+            }
+
+
+
+
+            freeDraw = !freeDraw;
+
+
+        }
+
+        function connectVerticesButton(){
+
+            if(freeDraw){
+                toggleFreeDrawButton();
+            }
+
+            toggleConnectVerticesButton();
+
+            console.log("connectVertices");
+        }
+
+        function toggleConnectVerticesButton(){
+            var button = document.getElementById("connectVerticesButton");
+            if(connectVertices){
+                button.classList.remove("buttonOn");
+            } else {
+                button.classList.add("buttonOn");
+            }
+
+            connectVertices = !connectVertices;
+        }
+
+        function generateGraphFromForm(){
+            console.log("generateGraphFromForm");
+
+            var labelInput = document.getElementById("labelInput").value;
+            var edgeInput = document.getElementById("edgeInput").value;
+
+            labels = labelInput.split(",");
+            edges = edgeInput.split(";");
+
+            edges = edges.map(edge => edge.split(","));
+            console.log("{ " + labels + " }, { " + edges + " }");
+
+            drawGraph();
+            updateGraphInfo();
+        }
+
+        //construct labels
+        function generateLabelsAndEdgesFromForm(){
+            var numLabels = document.getElementById("numLabels").valueAsNumber || 1;
+            var numEdges = document.getElementById("numEdges").valueAsNumber || 1;
+
+            labels = [];
+            edges = [];
+            clicks = [];
+            points = [];
+
+            for (var i = 1; i <= numLabels; i++) {
+                labels.push(i.toString());
+            }
+
+            console.log("generateLabelsAndEdgesFromForm");
+            console.log("numLabels: " + numLabels);
+            console.log("numEdges: " + numEdges);
+
+            //construct edges
+            for (var i = 0; i < numEdges; i++) {
+                var edge = [];
+                do {
+                    //An edge cannot connect to itself
+                    edge[0] = labels[Math.floor(Math.random() * numLabels)];
+                    edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    while (edge[0] == edge[1]) {
+                        edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    }
+
+                } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
+                edges.push(edge);
+            }
+            console.log("{ " + labels + " }, { " + edges + " }");
+
+            drawGraph();
+            updateGraphInfo();
+
+            graphReady = true;
+        }
+
+        //Automatically draw the points
+        //Select points on the canvas randomly, checkin for overlap
+        function autoDraw(){
+            resetDraw();
+            labels.forEach(function(label){
+                var newClick;
+                do {
+                    newClick = {    x: Math.random() * (canvas.width - 30) + 15, 
+                                    y: Math.random() * (canvas.height - 30) + 15, 
+                                };
+                } while (clicks.some(click => overlap(click, newClick)));
+
+                clicks.push(newClick);
+
+            });
+
+            
+            drawGraph();
+
+            graphReady = false;
+        }
+
+        //Remove redundant edges, e.g. 1,2 should only appear once
+        //i.e. remove duplicates from the edge array
+        function simplifyEdges(){
+            var newEdges = [];
+
+            for (let i = 0; i < edges.length; i++){
+                var edge = edges[i];
+
+                for (let j = 0; j < newEdges.length; j ++) {
+                    if(newEdges[j][0] == edge[0] && newEdges[j][1] == edge[1]){
+                        console.log("duplicate edge: " + edge);
+                        edge = null;
+                        break;
+                    }
+                }
+                if (edge != null){
+                    newEdges.push(edge);
+                }
+               
+            }
+            edges = newEdges;
+            drawGraph();
+            updateGraphInfo();
+        }
+
+
+        function resetDraw(){
+            clicks = [];
+            drawGraph();
+
+            graphReady = true;
+        }
+
+        function resetGraph(){
+            labels = [];
+            edges = [];
+            clicks = [];
+            points = [];
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateGraphInfo();
+
+            graphReady = false;
+        }
+
+
+
+
+
+        //Caluclat ethe sum of the degrees of the graph
+        function sumOfDegrees() {
+            var sum = 0;
+            for (var i = 0; i < points.length; i++) {
+                var degree = 0;
+                for (var j = 0; j < edges.length; j++) {
+                    if (edges[j][0] == points[i].label || edges[j][1] == points[i].label) {
+                        //console.log("Edge: " + edges[j]);
+                        degree++;
+                    }
+                }
+                sum += degree;
+            }
+            return sum;
+        }
+
+        // Draw points with labels
+        function drawPoint(point) {
+
+
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 15, 0, 2 * Math.PI);
+
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+
+            if(selectedLabels.includes(point.label)){
+                ctx.fillStyle = "green";
+                ctx.fill();
+            }
+            ctx.closePath();
+
+
+
+            ctx.font = "12px Arial";
+
+            if(selectedLabels.includes(point.label)){
+                ctx.fillStyle = "white";
+            } else {
+                ctx.fillStyle = "black";
+            }
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(point.label, point.x, point.y);
+        }
+    
+        //Draw a line with an array
+        function drawLine(point1, point2) {
+
+            var angle = Math.atan2(point2.y - point1.y, point2.x - point1.x);
+
+
+            var length = Math.sqrt((point1.x - point2.x)**2 + (point1.y - point2.y)**2);
+            var ratio = (length - 15)  / length; //adjust fro 30px space
+
+            // calculate the starting point at the dge of the circle
+            var startPointX = point1.x + 15 * Math.cos(angle);
+            var startPointY = point1.y + 15 * Math.sin(angle);
+
+            var endPointX = point1.x + (point2.x - point1.x) * ratio;
+            var endPointY = point1.y + (point2.y - point1.y) * ratio;
+
+            ctx.beginPath();
+            ctx.moveTo(startPointX, startPointY);
+            ctx.lineTo(endPointX, endPointY);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+            ctx.closePath();
+            //Draw arrow
+            var arrowSize = 15;
+            ctx.beginPath();
+            ctx.moveTo(endPointX, endPointY);
+            ctx.lineTo(endPointX - arrowSize * Math.cos(angle - Math.PI / 6), endPointY - arrowSize * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(endPointX, endPointY);
+            ctx.lineTo(endPointX - arrowSize * Math.cos(angle + Math.PI / 6), endPointY - arrowSize * Math.sin(angle + Math.PI / 6));
+
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        function findPoint(label) {
+            return points.find(point => point.label == label);
+        }
+
+        // Function to check if two points overlap
+        function overlap(point1, point2) {
+            var dx = point1.x - point2.x;
+            var dy = point1.y - point2.y;
+            var distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < 30;
+        }
+
+        function drawGraph() {      
+            
+            //Reset the points on each draw because there may be new clicks
+            points = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (var i = 0; i < labels.length; i++) {
+                var clickLocation;
+                if(clicks[i] != null){
+                    clickLocation = clicks[i];
+                } else {
+                    clickLocation = { x: canvas.width - 30, 
+                                    y: canvas.height - 30 }
+                }
+
+                newPoint = {    x: clickLocation.x, 
+                                y: clickLocation.y, 
+                                label: labels[i] 
+                            };
+                points.push(newPoint);
+            }
+
+
+
+            for (var i = 0; i < points.length - 1; i++) {
+                drawPoint(points[i]);
+            }
+            // Draw the last point
+            drawPoint(points[points.length - 1]);
+
+            for (var i = 0; i < edges.length; i++) {
+                var point1 = findPoint(edges[i][0]);
+                var point2 = findPoint(edges[i][1]);
+                drawLine(point1, point2);
+            }
+
+        
+        }
+
+        // Function to update the graph information text box
+        function updateGraphInfo() {
+            var graphInfo = document.getElementById("graphInfo");
+
+            var edgePairs = [];
+            for (var i = 0; i < edges.length; i++) {
+                edgePairs.push("(" + edges[i][0] + ", " + edges[i][1] + ")");
+            }
+
+            console.log("Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }");
+            graphInfo.innerHTML = "Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }";
+        }
+        
+
+    </script>
+
+</body>

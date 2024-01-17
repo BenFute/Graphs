@@ -1,0 +1,233 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph with 3 vertices</title>
+</head>
+<body>
+    <canvas id="graphCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+    <div id="graphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+    <script>
+
+
+
+        var canvas = document.getElementById("graphCanvas");
+        var ctx = canvas.getContext("2d");
+
+        // Generate points manually
+        // var labels = ["1", "2", "3", "4", "5", "6"]
+        // var edges = [   ["1", "2"], 
+        //                 ["1", "5"], 
+        //                 ["2", "1"], 
+        //                 ["2", "4"],
+        //                 ["5", "4"],
+        //                 ["5", "6"],
+        //                 ["6", "1"],
+        //                 ["6", "3"], 
+        //             ];
+
+        //generatePoints(10, 7);
+        // for (var i = 4; i < 10; i++) {
+        //     console.log("number of edges: " + 10)
+        //     console.log("number of vertices: " + i)
+        //     generatePoints(10, i);
+        // }
+        // Generate points prograamatically
+
+
+        var labels = []
+        var numLabels = 4;
+        var edges = []
+        var numEdges = 6;
+
+        //construct labels
+        function generateLabelsAndEdges(numLabels, numEdges){
+            for (var i = 1; i <= numLabels; i++) {
+                labels.push(i.toString());
+            }
+
+            //construct edges
+            for (var i = 0; i < numEdges; i++) {
+                var edge = [];
+                do {
+                    //An edge cannot connect to itself
+                    edge[0] = labels[Math.floor(Math.random() * numLabels)];
+                    edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    while (edge[0] == edge[1]) {
+                        edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    }
+
+                } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
+                edges.push(edge);
+            }
+            console.log("{ " + labels + " }, { " + edges + " }");
+
+        }
+
+        function manualLabelsAndEdges(){
+            labels = ["1", "2", "3", "4", "5", "6"]
+            edges = [   ["1", "2"], 
+                        ["1", "5"], 
+                        ["2", "1"], 
+                        ["2", "4"],
+                        ["5", "4"],
+                        ["5", "6"],
+                        ["6", "1"],
+                        ["6", "3"], 
+                    ];
+        }
+        
+
+        manualLabelsAndEdges(numLabels, numEdges);
+
+        //Convert labels to points for drawing.
+        var points = [];
+        var clicks = []; 
+
+        canvas.addEventListener('click', function(event) {
+                var rect = canvas.getBoundingClientRect();
+                var mouseX = event.clientX - rect.left;
+                var mouseY = event.clientY - rect.top;
+
+                var newClick = { x: mouseX, 
+                                 y: mouseY };
+                clicks.push(newClick);
+                drawGraph();
+
+        });
+
+
+
+        // Draw points with labels
+        drawGraph();
+        updateGraphInfo();
+        console.log("Sum of degrees: " + sumOfDegrees());
+
+        //Caluclat ethe sum of the degrees of the graph
+        function sumOfDegrees() {
+            var sum = 0;
+            for (var i = 0; i < points.length; i++) {
+                var degree = 0;
+                for (var j = 0; j < edges.length; j++) {
+                    if (edges[j][0] == points[i].label || edges[j][1] == points[i].label) {
+                        //console.log("Edge: " + edges[j]);
+                        degree++;
+                    }
+                }
+                sum += degree;
+            }
+            return sum;
+        }
+
+        // Draw points with labels
+        function drawPoint(point) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 15, 0, 2 * Math.PI);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.font = "12px Arial";
+            ctx.fillStyle = "black";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(point.label, point.x, point.y);
+        }
+    
+        //Draw a line with an array
+        function drawLine(point1, point2) {
+
+            var length = Math.sqrt((point1.x - point2.x)**2 + (point1.y - point2.y)**2);
+            var ratio = (length - 15)  / length; //adjust fro 30px space
+            var endPointX = point1.x + (point2.x - point1.x) * ratio;
+            var endPointY = point1.y + (point2.y - point1.y) * ratio;
+
+            ctx.beginPath();
+            ctx.moveTo(point1.x, point1.y);
+            ctx.lineTo(endPointX, endPointY);
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+            ctx.closePath();
+            //Draw arrow
+            var angle = Math.atan2(point2.y - point1.y, point2.x - point1.x);
+            var arrowSize = 10;
+            ctx.beginPath();
+            ctx.moveTo(endPointX, endPointY);
+            ctx.lineTo(endPointX - arrowSize * Math.cos(angle - Math.PI / 6), endPointY - arrowSize * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(endPointX, endPointY);
+            ctx.lineTo(endPointX - arrowSize * Math.cos(angle + Math.PI / 6), endPointY - arrowSize * Math.sin(angle + Math.PI / 6));
+
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        function findPoint(label) {
+            return points.find(point => point.label == label);
+        }
+
+        // Function to check if two points overlap
+        function overlap(point1, point2) {
+            var dx = point1.x - point2.x;
+            var dy = point1.y - point2.y;
+            var distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < 30;
+        }
+
+        function drawGraph() {      
+            
+            //Reset the points on each draw because there may be new clicks
+            points = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (var i = 0; i < labels.length; i++) {
+            var clickLocation;
+            if(clicks[i] != null){
+                clickLocation = clicks[i];
+            } else {
+                clickLocation = { x: canvas.width - 30, 
+                                y: canvas.height - 30 }
+            }
+
+            newPoint = {    x: clickLocation.x, 
+                            y: clickLocation.y, 
+                            label: labels[i] 
+                        };
+            points.push(newPoint);
+            }
+
+
+
+            for (var i = 0; i < points.length - 1; i++) {
+                drawPoint(points[i]);
+            }
+            // Draw the last point
+            drawPoint(points[points.length - 1]);
+
+            for (var i = 0; i < edges.length; i++) {
+                var point1 = findPoint(edges[i][0]);
+                var point2 = findPoint(edges[i][1]);
+                drawLine(point1, point2);
+            }
+
+        
+        }
+
+        // Function to update the graph information text box
+        function updateGraphInfo() {
+            var graphInfo = document.getElementById("graphInfo");
+
+            var edgePairs = [];
+            for (var i = 0; i < edges.length; i++) {
+                edgePairs.push("(" + edges[i][0] + ", " + edges[i][1] + ")");
+            }
+
+            graphInfo.innerHTML = "Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }";
+        }
+        
+
+    </script>
+
+</body>
