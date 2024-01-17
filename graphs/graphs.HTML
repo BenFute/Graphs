@@ -1,41 +1,159 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graph with 3 vertices</title>
+    <title>Graphs with Input</title>
 </head>
 <body>
-    <canvas id="graphCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
 
+    <form id="graphForm">
+        <label for="numLabels">Number of Labels:</label>
+        <input type="number" id="numLabels" name="numLabels" min="1" value="4">
+
+        <label for="numEdges">Number of Edges:</label>
+        <input type="number" id="numEdges" name="numEdges" min="1" value="6">
+
+        <button type="button" onclick="generateLabelsAndEdgesFromForm()">Generate Random Graph</button>
+    </form>
+
+    
+    <form id="graphFormManual">
+        <label for="labels">Enter Labels:</label>
+        <input type="text" id="labelInput" name="labelInput" value="1,2,3,4">
+
+        <label for="edges">Enter Edges:</label>
+        <input type="text" id="edgeInput" name="edgeInput" value="1,2;1,2;2,3;3,4;4,1">
+
+        <button type="button" onclick="generateGraphFromForm()">Generate Graph</button>
+    </form>
+
+
+
+    <canvas id="graphCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+    <br>
+    <button type="button" onclick="autoDraw()">Auto Draw</button>
+    <br>
+    <button type="button" onclick="resetDraw()">Reset Drawing</button>
+    <div id="graphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
     <script>
         var canvas = document.getElementById("graphCanvas");
         var ctx = canvas.getContext("2d");
 
-        // Generate three random points
-        var labels = ["1", "2", "3", "4", "5", "6"]
-        var edges = [   ["1", "2"], 
-                        ["1", "5"], 
-                        ["2", "1"], 
-                        ["2", "4"],
-                        ["5", "4"],
-                        ["5", "6"],
-                        ["6", "1"],
-                        ["6", "3"], 
-                    ];
-        var points = []
+        var labels = [];
+        var edges = [];
+        var points = [];
+        var clicks = []; 
 
-        labels.forEach(function(label){
 
-            var newPoint;
-            do {
-                newPoint = {    x: Math.random() * (canvas.width - 30) + 15, 
-                                y: Math.random() * (canvas.height - 30) + 15, 
-                                label: label };
-            } while (points.some(point => overlap(point, newPoint)));
+        function generateGraphFromForm(){
+            console.log("generateGraphFromForm");
 
-            points.push(newPoint)
+            var labelInput = document.getElementById("labelInput").value;
+            var edgeInput = document.getElementById("edgeInput").value;
+
+            labels = labelInput.split(",");
+            edges = edgeInput.split(";");
+
+            edges = edges.map(edge => edge.split(","));
+            console.log("{ " + labels + " }, { " + edges + " }");
+
+            drawGraph();
+            updateGraphInfo();
+        }
+
+        //construct labels
+        function generateLabelsAndEdgesFromForm(){
+            var numLabels = document.getElementById("numLabels").valueAsNumber || 1;
+            var numEdges = document.getElementById("numEdges").valueAsNumber || 1;
+
+            labels = [];
+            edges = [];
+            clicks = [];
+            points = [];
+
+            for (var i = 1; i <= numLabels; i++) {
+                labels.push(i.toString());
+            }
+
+            console.log("generateLabelsAndEdgesFromForm");
+            console.log("numLabels: " + numLabels);
+            console.log("numEdges: " + numEdges);
+
+            //construct edges
+            for (var i = 0; i < numEdges; i++) {
+                var edge = [];
+                do {
+                    //An edge cannot connect to itself
+                    edge[0] = labels[Math.floor(Math.random() * numLabels)];
+                    edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    while (edge[0] == edge[1]) {
+                        edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    }
+
+                } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
+                edges.push(edge);
+            }
+            console.log("{ " + labels + " }, { " + edges + " }");
+
+            drawGraph();
+            updateGraphInfo();
+        }
+
+        //Automatically draw the points
+        //Select points on the canvas randomly, checkin for overlap
+        function autoDraw(){
+            resetDraw();
+            labels.forEach(function(label){
+                var newClick;
+                do {
+                    newClick = {    x: Math.random() * (canvas.width - 30) + 15, 
+                                    y: Math.random() * (canvas.height - 30) + 15, 
+                                };
+                } while (clicks.some(click => overlap(click, newClick)));
+
+                clicks.push(newClick);
+
+            });
+
+            
+            drawGraph();
+        }
+        function resetDraw(){
+            clicks = [];
+            drawGraph();
+        }
+
+
+
+        //Convert labels to points for drawing.
+        canvas.addEventListener('click', function(event) {
+                var rect = canvas.getBoundingClientRect();
+                var mouseX = event.clientX - rect.left;
+                var mouseY = event.clientY - rect.top;
+
+                var newClick = { x: mouseX, 
+                                 y: mouseY };
+                clicks.push(newClick);
+                drawGraph();
         });
+
+        //Caluclat ethe sum of the degrees of the graph
+        function sumOfDegrees() {
+            var sum = 0;
+            for (var i = 0; i < points.length; i++) {
+                var degree = 0;
+                for (var j = 0; j < edges.length; j++) {
+                    if (edges[j][0] == points[i].label || edges[j][1] == points[i].label) {
+                        //console.log("Edge: " + edges[j]);
+                        degree++;
+                    }
+                }
+                sum += degree;
+            }
+            return sum;
+        }
 
         // Draw points with labels
         function drawPoint(point) {
@@ -92,7 +210,30 @@
             return distance < 30;
         }
 
-        function drawGraph() {
+        function drawGraph() {      
+            
+            //Reset the points on each draw because there may be new clicks
+            points = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (var i = 0; i < labels.length; i++) {
+            var clickLocation;
+            if(clicks[i] != null){
+                clickLocation = clicks[i];
+            } else {
+                clickLocation = { x: canvas.width - 30, 
+                                y: canvas.height - 30 }
+            }
+
+            newPoint = {    x: clickLocation.x, 
+                            y: clickLocation.y, 
+                            label: labels[i] 
+                        };
+            points.push(newPoint);
+            }
+
+
+
             for (var i = 0; i < points.length - 1; i++) {
                 drawPoint(points[i]);
             }
@@ -107,8 +248,19 @@
 
         
         }
-        drawGraph();
 
+        // Function to update the graph information text box
+        function updateGraphInfo() {
+            var graphInfo = document.getElementById("graphInfo");
+
+            var edgePairs = [];
+            for (var i = 0; i < edges.length; i++) {
+                edgePairs.push("(" + edges[i][0] + ", " + edges[i][1] + ")");
+            }
+
+            graphInfo.innerHTML = "Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }";
+        }
+        
 
     </script>
 
