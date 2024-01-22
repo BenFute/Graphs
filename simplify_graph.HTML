@@ -67,6 +67,7 @@
 
         //Convert labels to points for drawing.
         canvas.addEventListener('click', function(event) {
+            console.log("click");
             var rect = canvas.getBoundingClientRect();
             var mouseX = event.clientX - rect.left;
             var mouseY = event.clientY - rect.top;
@@ -190,6 +191,9 @@
 
             drawGraph();
             updateGraphInfo();
+            
+            //Enable drawing the graph
+            graphReady = true;
         }
 
         //construct labels
