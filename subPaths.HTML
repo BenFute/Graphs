@@ -10,18 +10,33 @@
             background-color: #4CAF50;
             color: white;
         }
+
+        .flex-container {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .graph-element {
+            margin-top: 10px;
+            margin-right: 20px;
+            font-family: Arial;
+
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
     <form id="graphForm">
         <label for="numLabels">Number of Labels:</label>
-        <input type="number" id="numLabels" name="numLabels" min="1" value="4">
+        <input type="number" id="numLabels" name="numLabels" min="1" value="10">
 
         <label for="numEdges">Number of Edges:</label>
-        <input type="number" id="numEdges" name="numEdges" min="1" value="6">
+        <input type="number" id="numEdges" name="numEdges" min="1" value="12">
 
         <button type="button" onclick="generateLabelsAndEdgesFromForm()">Generate Random Graph</button>
+        <button type="button" onclick="generateLabelsAndEdgesFromFormDraw()">Draw</button>
+
     </form>
 
     
@@ -37,7 +52,10 @@
     </form>
     <button type="button" id="freeDrawButton" onclick="drawVertices()">Draw Vertices</button>
     <button type="button"id="connectVerticesButton" onclick="connectVerticesButton()">Connect Vertices</button>
+    <br>
     <button type="button"id="connectRed" onclick="selectRed()">Connect 'Red' Subpath</button>
+    <button type="button"id="connectBlue" onclick="selectBlue()">Connect 'Blue' Subpath</button>
+
 
     <br>
 
@@ -56,8 +74,12 @@
     <button type="button" onclick="simplifyEdges()">Simplify Edges</button>
     <br><br>
     <button type="button" onclick="matrixForm()">Construct Matrix Form.</button>
-    <div id="graphMatrix" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+    <div class="flex-container">
+        <div id="graphMatrix" class="graph-element" style=""></div>
+        <div id="graphMatrixRed" class="graph-element"></div>
+        <div id="graphMatrixBlue" class="graph-element"></div>
 
+    </div>
 
     <script>
         var canvas = document.getElementById("graphCanvas");
@@ -73,15 +95,21 @@
         var connectVertices = false;
         var graphReady = false;
 
-        //Subpath
+        //Red subpath
         var connectRed = false;
         var redLabels = [];
         var redEdges = [];
 
+        //Blue subpath
+        var connectBlue = false;
+        var blueLabels = [];
+        var blueEdges = [];
+
+
 
         //Convert labels to points for drawing.
         canvas.addEventListener('click', function(event) {
-            console.log("click");
+            //console.log("click");
             var rect = canvas.getBoundingClientRect();
             var mouseX = event.clientX - rect.left;
             var mouseY = event.clientY - rect.top;
@@ -95,12 +123,35 @@
                         //If a point is not already in redLabls, push it to the red set
                         if(isRedValid(point.label)){
                             redLabels.push(point.label);
-                            console.log("redLabels: " + redLabels);
+                            //console.log("redLabels: " + redLabels);
                             if(redLabels.length > 1){
 
                                 var newEdge = [redLabels[redLabels.length - 2], redLabels[redLabels.length - 1]];
                                 redEdges.push(newEdge);
-                                console.log("redEdges: " + redEdges);
+                                //console.log("redEdges: " + redEdges);
+                            }
+
+                        }
+
+                        updateGraphInfo();
+                        drawGraph();
+                    
+                    }
+                }
+            }
+            
+            if(connectBlue){
+
+                for (const point of points) {
+                    if (isPointClicked(mouseX, mouseY, point)) {
+                        //If a point is not already in redLabls, push it to the red set
+                        if(isBlueValid(point.label)){
+                            blueLabels.push(point.label);
+                            //console.log("blueLabels: " + blueLabels);
+                            if(blueLabels.length > 1){
+
+                                var newEdge = [blueLabels[blueLabels.length - 2], blueLabels[blueLabels.length - 1]];
+                                blueEdges.push(newEdge);
                             }
 
                         }
@@ -117,13 +168,13 @@
                     if (isPointClicked(mouseX, mouseY, point)) {
 
                         selectedLabels.push(point.label);
-                        console.log("selectedLabels: " + selectedLabels);
+                        //console.log("selectedLabels: " + selectedLabels);
 
                         if(selectedLabels.length == 2){
                             var newEdge = [selectedLabels[0], selectedLabels[1]];
                             edges.push(newEdge);
                             selectedLabels = [];
-                            console.log("edges: " + edges);
+                            //console.log("edges: " + edges);
                         }
                         updateGraphInfo();
                         drawGraph();
@@ -133,7 +184,7 @@
             }
 
             if(freeDraw){
-                console.log("freeDraw");
+                //console.log("freeDraw");
 
                 var newClick = { x: mouseX, 
                                 y: mouseY };
@@ -148,7 +199,7 @@
                 drawGraph();
                 updateGraphInfo();
             } else if (graphReady){
-                console.log("draw");
+                //console.log("draw");
                 var rect = canvas.getBoundingClientRect();
 
                 var newClick = { x: mouseX, 
@@ -176,6 +227,24 @@
             return true;
         }
 
+        function isBlueValid(label){
+            //If the label is already in the blue set, it is not valid
+            if(blueLabels.includes(label)){
+                return false;
+            }
+
+            //If the label is not connected to the last label in the blue set, it is not valid
+            if(blueLabels.length > 0){
+                var lastLabel = blueLabels[blueLabels.length - 1];
+                var edge = edges.find(edge => edge[0] == lastLabel && edge[1] == label);
+                if(edge == null){
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         function isPointClicked(mouseX, mouseY, point) {
             var distance = Math.sqrt((mouseX - point.x) ** 2 + (mouseY - point.y) ** 2);
             return distance <= 30; // Radius of the circle
@@ -184,8 +253,8 @@
         function drawVertices(){
             toggleFreeDrawButton();
 
-            console.log("drawVertices");
-            console.log("clicks" + clicks);
+            //console.log("drawVertices");
+            //console.log("clicks" + clicks);
 
 
             //drawGraph();
@@ -221,7 +290,7 @@
 
             toggleConnectVerticesButton();
 
-            console.log("connectVertices");
+            //console.log("connectVertices");
         }
 
         function toggleConnectVerticesButton(){
@@ -236,12 +305,16 @@
         }
 
         function selectRed(){
-            console.log("selectRed");
+            //console.log("selectRed");
             
             toggleConnectRedButton();
 
             if(connectVertices){
                 toggleConnectVerticesButton();
+            }
+
+            if(connectBlue){
+                toggleConnectBlueButton();
             }
         }
 
@@ -254,11 +327,34 @@
             }
 
             connectRed = !connectRed;
-            console.log("connectRed: " + connectRed);
+            //console.log("connectRed: " + connectRed);
         }
 
+        function selectBlue(){
+            //console.log("selectBlue");
+            toggleConnectBlueButton();
+
+            if(connectVertices){
+                toggleConnectVerticesButton();
+            }
+            if(connectRed){
+                toggleConnectRedButton();
+            }
+        }
+
+        function toggleConnectBlueButton(){
+            var button = document.getElementById("connectBlue");
+            if(connectBlue){
+                button.classList.remove("buttonOn");
+            } else {
+                button.classList.add("buttonOn");
+            }
+
+            connectBlue = !connectBlue;
+            //console.log("connectBlue: " + connectBlue);
+        }
         function generateGraphFromForm(){
-            console.log("generateGraphFromForm");
+            //console.log("generateGraphFromForm");
 
             var labelInput = document.getElementById("labelInput").value;
             var edgeInput = document.getElementById("edgeInput").value;
@@ -267,7 +363,7 @@
             edges = edgeInput.split(";");
 
             edges = edges.map(edge => edge.split(","));
-            console.log("{ " + labels + " }, { " + edges + " }");
+            //console.log("{ " + labels + " }, { " + edges + " }");
 
             drawGraph();
             updateGraphInfo();
@@ -290,9 +386,9 @@
                 labels.push(i.toString());
             }
 
-            console.log("generateLabelsAndEdgesFromForm");
-            console.log("numLabels: " + numLabels);
-            console.log("numEdges: " + numEdges);
+            // console.log("generateLabelsAndEdgesFromForm");
+            // console.log("numLabels: " + numLabels);
+            // console.log("numEdges: " + numEdges);
 
             //construct edges
             for (var i = 0; i < numEdges; i++) {
@@ -308,10 +404,49 @@
                 } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
                 edges.push(edge);
             }
-            console.log("{ " + labels + " }, { " + edges + " }");
+            //console.log("{ " + labels + " }, { " + edges + " }");
 
             drawGraph();
             updateGraphInfo();
+
+            graphReady = true;
+        }
+
+         //construct labels
+         function generateLabelsAndEdgesFromFormDraw(){
+            var numLabels = document.getElementById("numLabels").valueAsNumber || 1;
+            var numEdges = document.getElementById("numEdges").valueAsNumber || 1;
+
+            labels = [];
+            edges = [];
+            clicks = [];
+            points = [];
+
+            for (var i = 1; i <= numLabels; i++) {
+                labels.push(i.toString());
+            }
+
+
+            //construct edges
+            for (var i = 0; i < numEdges; i++) {
+                var edge = [];
+                do {
+                    //An edge cannot connect to itself
+                    edge[0] = labels[Math.floor(Math.random() * numLabels)];
+                    edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    while (edge[0] == edge[1]) {
+                        edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                    }
+
+                } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
+                edges.push(edge);
+            }
+            //console.log("{ " + labels + " }, { " + edges + " }");
+
+            drawGraph();
+            updateGraphInfo();
+
+            autoDraw();
 
             graphReady = true;
         }
@@ -338,6 +473,9 @@
             graphReady = false;
         }
 
+
+        
+
         //Remove redundant edges, e.g. 1,2 should only appear once
         //i.e. remove duplicates from the edge array
         function simplifyEdges(){
@@ -348,7 +486,7 @@
 
                 for (let j = 0; j < newEdges.length; j ++) {
                     if(newEdges[j][0] == edge[0] && newEdges[j][1] == edge[1]){
-                        console.log("duplicate edge: " + edge);
+                        //console.log("duplicate edge: " + edge);
                         edge = null;
                         break;
                     }
@@ -359,6 +497,24 @@
                
             }
             edges = newEdges;
+
+            //Simplify red edges
+            var newRedEdges = [];
+            for (let i = 0; i < redEdges.length; i++){
+                var edge = redEdges[i];
+
+                for (let j = 0; j < newRedEdges.length; j ++) {
+                    if(newRedEdges[j][0] == edge[0] && newRedEdges[j][1] == edge[1]){
+                        //console.log("duplicate edge: " + edge);
+                        edge = null;
+                        break;
+                    }
+                }
+                if (edge != null){
+                    newRedEdges.push(edge);
+                }
+            }
+
             drawGraph();
             updateGraphInfo();
         }
@@ -411,8 +567,14 @@
             ctx.arc(point.x, point.y, 15, 0, 2 * Math.PI);
 
             //If the point is in the red subpath, color it red
-            if(redLabels.includes(point.label)){
+            if(redLabels.includes(point.label) && blueLabels.includes(point.label)){
+                ctx.fillStyle = "purple";
+                ctx.fill();
+            } else if(redLabels.includes(point.label)){
                 ctx.fillStyle = "red";
+                ctx.fill();
+            } else if(blueLabels.includes(point.label)){
+                ctx.fillStyle = "blue";
                 ctx.fill();
             } else {
                 ctx.fillStyle = "white";
@@ -431,7 +593,11 @@
 
             ctx.font = "12px Arial";
 
-            if(selectedLabels.includes(point.label)){
+            if(redLabels.includes(point.label) && blueLabels.includes(point.label)){
+                ctx.fillStyle = "white";
+            } else if(selectedLabels.includes(point.label)){
+                ctx.fillStyle = "white";
+            } else if(blueLabels.includes(point.label)){
                 ctx.fillStyle = "white";
             } else {
                 ctx.fillStyle = "black";
@@ -462,8 +628,13 @@
             ctx.lineTo(endPointX, endPointY);
 
             //If the edge is in the red subpath, color it red
-            if(redEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label)){
+            if(redEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label && blueEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label))){
+                ctx.strokeStyle = "purple";
+            }
+            else if(redEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label)){
                 ctx.strokeStyle = "red";
+            }  else if(blueEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label)){
+                ctx.strokeStyle = "blue";
             } else {
                 ctx.strokeStyle = "black";
             }
@@ -478,8 +649,13 @@
             ctx.lineTo(endPointX - arrowSize * Math.cos(angle + Math.PI / 6), endPointY - arrowSize * Math.sin(angle + Math.PI / 6));
 
             //If the edge is in the red subpath, color it red
-            if(redEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label)){
+            if(redEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label && blueEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label))){
+                ctx.strokeStyle = "purple";
+            }
+            else if(redEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label)){
                 ctx.strokeStyle = "red";
+            } else if(blueEdges.some(edge => edge[0] == point1.label && edge[1] == point2.label)){
+                ctx.strokeStyle = "blue";
             } else {
                 ctx.strokeStyle = "black";
             }
@@ -535,7 +711,7 @@
                 drawLine(point1, point2);
             }
 
-        
+            matrixForm();
         }
 
         // Function to update the graph information text box
@@ -547,7 +723,7 @@
                 edgePairs.push("(" + edges[i][0] + ", " + edges[i][1] + ")");
             }
 
-            console.log("Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }");
+            //console.log("Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }");
             graphInfo.innerHTML = "Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }";
 
             //Do the same for the red graph
@@ -557,12 +733,14 @@
             for (var i = 0; i < redEdges.length; i++) {
                 redEdgePairs.push("(" + redEdges[i][0] + ", " + redEdges[i][1] + ")");
             }
-            console.log("Red Graph: { " + redLabels + " }, { " + redEdgePairs.join(", ") + " }");
+            //console.log("Red Graph: { " + redLabels + " }, { " + redEdgePairs.join(", ") + " }");
             redGraphInfo.innerHTML = "Red Graph: { " + redLabels + " }, { " + redEdgePairs.join(", ") + " }";
 
         }
 
         var matrixValues = [];
+        var redMatrixValues = [];
+        var blueMatrixValues = [];
         //Ex matrix form
         // [Log] ["0", "0", "1", "1", "1", "1", "1", "1"] (8) (subPaths.HTML, line 517)
         // [Log] ["1", "0", "0", "1", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
@@ -574,14 +752,19 @@
         function matrixForm(){
             var matrix = document.getElementById("graphMatrix");
 
-            var matrixString = "";
+            var matrixString = "Main graph";
 
-            //add column header
-            matrixString += ". ";
-            for (var i = 0; i < labels.length; i++){
-                matrixString += labels[i] + " ";
-            }
+                
             matrixString += "<br>";
+
+            //Add a header row
+            var headerRow = [];
+            for (var i = 0; i < labels.length; i++){
+                headerRow.push(labels[i] % 10);
+            }
+            matrixString += "_ ";
+            matrixString += headerRow.join(" ") + "<br>";
+
 
             for (var i = 0; i < labels.length; i++){
                 var row = [];
@@ -589,7 +772,7 @@
                     var edge = edges.find(edge => edge[0] == labels[i] && edge[1] == labels[j]);
                     //add row label
                     if(j == 0){
-                        row.push(labels[i]);
+                        row.push(labels[i] % 10);
                     }
 
                     if(edge != null){
@@ -611,9 +794,6 @@
                 for (var j = 0; j < labels.length; j++){
                     var edge = edges.find(edge => edge[0] == labels[i] && edge[1] == labels[j]);
                     //add row label
-                    if(j == 0){
-                        row.push(labels[i]);
-                    }
 
                     if(edge != null){
                         row.push("1");
@@ -627,10 +807,120 @@
 
             //print the matrix values
             for (var i = 0; i < matrixValues.length; i++){
-                console.log(matrixValues[i]);
+               // console.log(matrixValues[i]);
+            }
+
+
+            //Do the same for the red graph
+            var redMatrix = document.getElementById("graphMatrixRed");
+
+            var redMatrixString = "Red subpath";
+
+            redMatrixString += "<br>";
+
+            //Get the matrix from the main graph, and set the points that are not in the red graph to 0
+
+            //Add a header row
+            var headerRow = [];
+            for (var i = 0; i < labels.length; i++){
+                headerRow.push(labels[i] % 10);
+            }
+            redMatrixString += "_ ";
+            redMatrixString += headerRow.join(" ") + "<br>";
+            
+            for (var i = 0; i < labels.length; i++){
+                var row = [];
+                for (var j = 0; j < labels.length; j++){
+                    var edge = edges.find(edge => edge[0] == labels[i] && edge[1] == labels[j]);
+                    //add row label
+                    if(j == 0){
+                        row.push(labels[i] % 10);
+                    }
+
+                    if(edge != null && redEdges.some(edgePair => edgePair[0] == edge[0] && edgePair[1] == edge[1])){
+                        row.push("1");
+                    } else {
+                        row.push("0");
+                    }
+                }
+                redMatrixString += row.join(" ") + "<br>";
+            }
+
+            redMatrix.innerHTML = redMatrixString;
+            //add vertex labels
+            redMatrix.innerHTML += "<br>";
+
+            //Add the graph to the redMatrixValues array
+            for (var i = 0; i < redLabels.length; i++){
+                var row = [];
+                for (var j = 0; j < redLabels.length; j++){
+                    var edge = redEdges.find(edge => edge[0] == redLabels[i] && edge[1] == redLabels[j]);
+                    //add row label
+
+                    if(edge != null && redEdges.some(edgePair => edgePair[0] == edge[0] && edgePair[1] == edge[1])){
+                        row.push("1");
+                    } else {
+                        row.push("0");
+                    }
+                }
+                redMatrixValues.push(row);
             }
 
             
+            //Do the same for the blue graph
+            var blueMatrix = document.getElementById("graphMatrixBlue");
+            var blueMatrixString = "Blue subpath";
+            blueMatrixString += "<br>";
+
+            //Add a header row
+            var headerRow = [];
+            for (var i = 0; i < labels.length; i++){
+                headerRow.push(labels[i] % 10);
+            }
+            blueMatrixString += "_ ";
+            blueMatrixString += headerRow.join(" ") + "<br>";
+
+            for (var i = 0; i < labels.length; i ++){
+                var row = [];
+                for (var j = 0; j < labels.length; j++){
+                    var edge = edges.find(edge => edge[0] == labels[i] && edge[1] == labels[j]);
+                    //add row label
+                    if(j == 0){
+                        row.push(labels[i] % 10);
+                    }
+
+                    //check if the edge pair is in the blueEdges array
+                    if(edge != null && blueEdges.some(edgePair => edgePair[0] == edge[0] && edgePair[1] == edge[1])){
+                        row.push("1");
+
+                    } else {
+                        row.push("0");
+                    }
+
+                }
+                blueMatrixString += row.join(" ") + "<br>";
+            }
+
+            blueMatrix.innerHTML = blueMatrixString;
+            //add vertex labels
+            blueMatrix.innerHTML += "<br>";
+
+
+            //Add the graph to the blueMatrixValues array
+            for (var i = 0; i < blueLabels.length; i++){
+                var row = [];
+                for (var j = 0; j < blueLabels.length; j++){
+                    var edge = blueEdges.find(edge => edge[0] == blueLabels[i] && edge[1] == blueLabels[j]);
+                    //add row label
+
+                    if(edge != null && blueEdges.some(edgePair => edgePair[0] == edge[0] && edgePair[1] == edge[1])){
+                        row.push("1");
+                    } else {
+                        row.push("0");
+                    }
+                }
+                blueMatrixValues.push(row);
+            }
 
         }
         
