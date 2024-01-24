@@ -62,7 +62,7 @@
 
 
 
-    <canvas id="graphCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+    <canvas id="graphCanvas" width="800" height="800" style="border:1px solid #000;"></canvas>
     <br>
     <button type="button" onclick="autoDraw()">Auto Draw</button>
     <br>
@@ -70,6 +70,7 @@
     <button type="button" onclick="resetGraph()">Reset Graph</button>
     <div id="graphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
     <div id="redGraphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+    <div id="blueGraphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
 
     <button type="button" onclick="simplifyEdges()">Simplify Edges</button>
     <br><br>
@@ -97,11 +98,15 @@
 
         //Red subpath
         var connectRed = false;
+        var selectedRed = null;
+        var redRoot = null;
         var redLabels = [];
         var redEdges = [];
 
         //Blue subpath
         var connectBlue = false;
+        var selectedBlue = null;
+        var blueRoot = null;
         var blueLabels = [];
         var blueEdges = [];
 
@@ -116,22 +121,71 @@
 
 
 
-            if(connectRed){
 
+            if(connectRed){
                 for (const point of points) {
                     if (isPointClicked(mouseX, mouseY, point)) {
-                        //If a point is not already in redLabls, push it to the red set
-                        if(isRedValid(point.label)){
-                            redLabels.push(point.label);
-                            //console.log("redLabels: " + redLabels);
-                            if(redLabels.length > 1){
 
-                                var newEdge = [redLabels[redLabels.length - 2], redLabels[redLabels.length - 1]];
-                                redEdges.push(newEdge);
-                                //console.log("redEdges: " + redEdges);
-                            }
+                        if (selectedRed != null) {
+                            //console.log("selected red: " + selectedRed.label);
+                        }
+
+                        if (redLabels.length > 0) {
+                            //console.log("redLabels: " + redLabels);
+                        }
+
+                        //If a point is not already in redLabls, push it to the red set
+                        if(selectedRed != null) {
+                            if(isRedValid(point.label)){
+
+                                //if redRoot is null, set selectedRed to the point
+                                if(redRoot == null){
+                                    redRoot = selectedRed;
+                                } else {
+
+                                }
+
+                                //If the point that selectedRed connects to is the root, make selectedRed the new root
+                                if(point.label == redRoot.label){
+                                    //console.log("redRoot: " + redRoot.label);
+
+                                    //make sure there is an edge between the selectedRed and the point
+                                    var edge = edges.find(edge => edge[0] == selectedRed.label && edge[1] == point.label);
+                                    if(edge != null){
+                                        redRoot = selectedRed;
+                                        return true;
+                                    } else {
+                                        return false
+                                    }
+                                }
+
+                                //if selectedRed not in redLabels, add it
+                                if(!redLabels.includes(selectedRed.label)){
+                                    redLabels.push(selectedRed.label);
+                                }
+                                redLabels.push(point.label);
+                                //console.log("redLabels: " + redLabels);
+                                if(redLabels.length > 1){
+
+                                    var newEdge = [selectedRed.label, point.label];
+                                    redEdges.push(newEdge);
+                                    selectedRed = null;
+                                    //console.log("redEdges: " + redEdges);
+                                }
+                             } else{
+                                selectedRed = null;
+                                //set selectedRed to the point
+                                //selectedRed = point;
+                             }
+                        } else {
+                            //set selectedRed to the point
+                            selectedRed = point;
+
+                            //redLabels.push(point.label);
 
                         }
+
+
 
                         updateGraphInfo();
                         drawGraph();
@@ -139,26 +193,64 @@
                     }
                 }
             }
-            
+            //Do the same for connectBlue
             if(connectBlue){
+                for (const point of points){
 
-                for (const point of points) {
-                    if (isPointClicked(mouseX, mouseY, point)) {
-                        //If a point is not already in redLabls, push it to the red set
-                        if(isBlueValid(point.label)){
-                            blueLabels.push(point.label);
+                    if(isPointClicked(mouseX, mouseY, point)) {
+
+                    
+                        if (selectedBlue != null) {
+                            //console.log("selected blue: " + selectedBlue.label);
+                        }
+
+                        if (blueLabels.length > 0) {
                             //console.log("blueLabels: " + blueLabels);
-                            if(blueLabels.length > 1){
+                        }
 
-                                var newEdge = [blueLabels[blueLabels.length - 2], blueLabels[blueLabels.length - 1]];
-                                blueEdges.push(newEdge);
+                        //If a point is not already in blueLabls, push it to the blue set
+                        if(selectedBlue != null) {
+                            if(isBlueValid(point.label)){
+                                //if blueRoot is null, set selectedBlue to the point
+                                if(blueRoot == null){
+                                    blueRoot = selectedBlue;
+                                } else {
+
+                                }
+
+                                //If the point that selectedBlue connects to is the root, make selectedBlue the new root
+                                if(point.label == blueRoot.label){
+                                    blueRoot = selectedBlue;
+                                }
+
+                                //if selectedBlue not in blueLabels, add it
+                                if(!blueLabels.includes(selectedBlue.label)){
+                                    blueLabels.push(selectedBlue.label);
+                                }
+                                blueLabels.push(point.label);
+                                if(blueLabels.length > 1){
+
+                                    var newEdge = [selectedBlue.label, point.label];
+                                    blueEdges.push(newEdge);
+                                    selectedBlue = null;
+                                    //console.log("blueEdges: " + blueEdges);
+                                }
+                            } else{
+                                selectedBlue = null;
+                                //set selectedBlue to the point
+                                //selectedBlue = point;
                             }
+                        } else {
+                            //console.log("blue not valid: " + point.label);
+                            //set selectedBlue to the point
+                            selectedBlue = point;
+
+                            //blueLabels.push(point.label);
 
                         }
 
                         updateGraphInfo();
                         drawGraph();
-                    
                     }
                 }
             }
@@ -210,39 +302,108 @@
         });
 
         function isRedValid(label){
-            //If the label is already in the red set, it is not valid
-            if(redLabels.includes(label)){
-                return false;
+
+            //If the red set is empty, the point is valid
+            if(redLabels.length == 0){
+                return true;
             }
 
-            //If the label is not connected to the last label in the red set, it is not valid
-            if(redLabels.length > 0){
-                var lastLabel = redLabels[redLabels.length - 1];
-                var edge = edges.find(edge => edge[0] == lastLabel && edge[1] == label);
-                if(edge == null){
+            //If the label is already in the red set, and selectedRed is not in the red set, then check if the label is the root of the red set
+            else if(redLabels.includes(label) && !redLabels.includes(selectedRed.label)){
+                //If the label is the root of the red set, it is valid
+                if(redRoot.label == label){
+                    //Check if there is a connecting edge
+                    var edge = edges.find(edge => edge[0] == selectedRed.label && edge[1] == label);
+
+                    if (edge != null){
+                        redRoot = selectedRed;
+                        return true;
+                    } else {
+                        //No connection
+                        return false;
+                    }
+                } else {
+                    //Not the root of the red set
                     return false;
                 }
             }
 
-            return true;
+
+
+            // else if(redLabels.includes(label)){
+            //     //If the label is connected to the selectedRed label, it is valid
+            //     var edge = edges.find(edge => edge[0] == selectedRed.label && edge[1] == label);
+            //     if(edge != null){
+            //         return true
+            //     } else {
+            //         //No connection
+            //         return false;
+            //     }
+            // }
+
+
+            //If label is not in redLabels, then check if selectedRed is in redLabels
+            else if(!redLabels.includes(label) && redLabels.includes(selectedRed.label)){
+                //Check to see if the selectedRed label is connected to the label
+                var edge = edges.find(edge => edge[0] == selectedRed.label && edge[1] == label);
+                if(edge != null){
+                    return true
+                } else {
+                    //No connection
+                    return false;
+                }
+
+            }
+
+            //If label is not in redLables, and
+
+
+            else {  
+                return false;
+            }
+
         }
 
         function isBlueValid(label){
-            //If the label is already in the blue set, it is not valid
-            if(blueLabels.includes(label)){
-                return false;
+            if(blueLabels.length == 0){
+                return true;
             }
 
-            //If the label is not connected to the last label in the blue set, it is not valid
-            if(blueLabels.length > 0){
-                var lastLabel = blueLabels[blueLabels.length - 1];
-                var edge = edges.find(edge => edge[0] == lastLabel && edge[1] == label);
-                if(edge == null){
+            else if(blueLabels.includes(label) && !blueLabels.includes(selectedBlue.label)){
+                //If the label is the root of the blue set, it is valid
+                if(blueRoot.label == label){
+                    //Check if there is a connecting edge
+                    var edge = edges.find(edge => edge[0] == selectedBlue.label && edge[1] == label);
+                    
+                    if (edge != null){
+                        blueRoot = selectedBlue;
+                        return true;
+                    } else {
+                        //No connection
+                        return false;
+                    }
+
+                } else {
+                    //Not the root of the blue set
                     return false;
                 }
             }
 
-            return true;
+            else if(!blueLabels.includes(label) && blueLabels.includes(selectedBlue.label)){
+                //Check to see if the selectedBlue label is connected to the label
+                var edge = edges.find(edge => edge[0] == selectedBlue.label && edge[1] == label);
+                if(edge != null){
+                    return true
+                } else {
+                    //No connection
+                    return false;
+                }
+
+            }
+
+            else {  
+                return false;
+            }
         }
 
         function isPointClicked(mouseX, mouseY, point) {
@@ -308,6 +469,10 @@
             //console.log("selectRed");
             
             toggleConnectRedButton();
+
+            if(drawVertices == true){
+                toggleFreeDrawButton();
+            }
 
             if(connectVertices){
                 toggleConnectVerticesButton();
@@ -570,6 +735,14 @@
             if(redLabels.includes(point.label) && blueLabels.includes(point.label)){
                 ctx.fillStyle = "purple";
                 ctx.fill();
+            } else if( selectedRed != null && point.label == selectedRed.label) {
+                //set to a new shade of red
+                ctx.fillStyle = "#ffa1a1";
+                ctx.fill();
+            } else if( selectedBlue != null && point.label == selectedBlue.label) {
+                //set to a new shade of red
+                ctx.fillStyle = "#a1a1ff";
+                ctx.fill();
             } else if(redLabels.includes(point.label)){
                 ctx.fillStyle = "red";
                 ctx.fill();
@@ -734,8 +907,21 @@
                 redEdgePairs.push("(" + redEdges[i][0] + ", " + redEdges[i][1] + ")");
             }
             //console.log("Red Graph: { " + redLabels + " }, { " + redEdgePairs.join(", ") + " }");
-            redGraphInfo.innerHTML = "Red Graph: { " + redLabels + " }, { " + redEdgePairs.join(", ") + " }";
+            if(redRoot != null) {
+                redGraphInfo.innerHTML = "Red Graph: { " + redLabels + " }, { " + redEdgePairs.join(", ") + " }, root: " + redRoot.label;
+            }
 
+
+            //Do the same for the blue graph
+            var blueGraphInfo = document.getElementById("blueGraphInfo");
+            var blueEdgePairs = [];
+            for (var i = 0; i < blueEdges.length; i++) {
+                blueEdgePairs.push("(" + blueEdges[i][0] + ", " + blueEdges[i][1] + ")");
+            }
+
+            if(blueRoot != null) {
+                blueGraphInfo.innerHTML = "Blue Graph: { " + blueLabels + " }, { " + blueEdgePairs.join(", ") + " }, root: " + blueRoot.label;
+            }
         }
 
         var matrixValues = [];
