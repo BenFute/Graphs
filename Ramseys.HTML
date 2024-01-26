@@ -1,0 +1,1138 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ramsey's Theorem</title>
+    <style>
+        .buttonOn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .flex-container {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .flex-vertical {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .graph-element {
+            margin-top: 10px;
+            margin-right: 20px;
+            font-family: Arial;
+
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <p>Specify graph here, or step through the proof to auto-generate the graph.</p>
+    <form id="graphForm">
+        <label for="numLabels">Number of Labels:</label>
+        <input type="number" id="numLabels" name="numLabels" min="1" value="10">
+
+        <label for="numEdges">Number of Edges:</label>
+        <input type="number" id="numEdges" name="numEdges" min="1" value="30">
+
+        <button type="button" onclick="generateLabelsAndEdgesFromForm()">Generate Random Graph</button>
+        <button type="button" onclick="generateLabelsAndEdgesFromFormDraw()">Draw</button>
+
+    </form>
+
+    
+    <form id="graphFormManual">
+        <label for="labels">Enter Labels:</label>
+        <input type="text" id="labelInput" name="labelInput" value="1,2,3,4">
+
+        <label for="edges">Enter Edges:</label>
+        <input type="text" id="edgeInput" name="edgeInput" value="1,2;1,2;2,3;3,4;4,1">
+
+        <button type="button" onclick="generateGraphFromForm()">Generate Graph</button> 
+        
+    </form>
+    <button type="button" id="freeDrawButton" onclick="drawVertices()">Draw Vertices</button>
+    <button type="button"id="connectVerticesButton" onclick="connectVerticesButton()">Connect Vertices</button>
+    <br>
+    <h2>Ramsey's theorem</h2>
+    <p>Let G be a graph.  A <b>clique</b> in G is a subgraph in which every two nodes are connected by an edge.  An <b>anti-clique,</b> also called an <b>independent set, </b> is a subgraph in which every two nodes are not connected by an edge.  Show that every graph with n nodes contains either a clique or an anti-clique with at least 1/2log2n nodes.</b></p>
+    <p>Proof:  Make space for two piles of nodes: A and B.</p>
+    <p>Then, starting with the entire graph, repeatedly add each remaining node x to A if its degree is greater than one half the number of remaining nodes and to B otherwise, and discard all nodes to which x isn't (is) connected if it was added to A (B).</p>
+    <p>Continue until no nodes are left.  At most half of the nodes are discarded at each of these steps, so at least log2n steps will occur before the process terminates.  Each step adds a node to one of the piles, so one of the piles ends up with at least 1/2 log2n nodes.</p> <p> The A pile contains the nodes of a clique and the B pile contains the nodes of an anti-clique.</p>
+    <p>To step through the proof, click the 'step' button.</p>
+    <button type="button" onclick="step()">Step</button>
+    <br></br>
+    <div id="graphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+
+
+
+    <div class="flex-container">
+        <canvas id="graphCanvas" width="800" height="800" style="border:1px solid #000;"></canvas>
+        <div class="flex-vert"> 
+            <canvas id="ACanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+            <canvas id="BCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+        </div>
+
+    </div>
+
+    <br>
+    <button type="button" onclick="autoDraw()">Auto Draw</button>
+    <br>
+    <button type="button" onclick="resetDraw()">Reset Drawing</button>
+    <button type="button" onclick="resetGraph()">Reset Graph</button>
+    <div id="AInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+    <div id="BInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+
+    <div id="redGraphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+    <div id="blueGraphInfo" style="margin-top: 10px; font-family: Arial; font-size: 14px;"></div>
+
+    <button type="button" onclick="simplifyEdges()">Simplify Edges</button>
+    <br><br>
+    <button type="button" onclick="matrixForm()">Construct Matrix Form.</button>
+    <div class="flex-container">
+        <div id="graphMatrix" class="graph-element" style=""></div>
+        <div id="graphMatrixRed" class="graph-element"></div>
+        <div id="graphMatrixBlue" class="graph-element"></div>
+
+    </div>
+
+    <script>
+        var canvas = document.getElementById("graphCanvas");
+        var ctx = canvas.getContext("2d");
+
+        var labels = [];
+        var edges = [];
+        var points = [];
+        var clicks = [];
+        var selectedLabels = []
+
+        var freeDraw = false;
+        var connectVertices = false;
+        var graphReady = false;
+
+        //Red subpath
+        var connectRed = false;
+        var selectedRed = null;
+        var redRoot = null;
+        var redLabels = [];
+        var redEdges = [];
+
+        //Blue subpath
+        var connectBlue = false;
+        var selectedBlue = null;
+        var blueRoot = null;
+        var blueLabels = [];
+        var blueEdges = [];
+
+
+        var AGraphs = [];
+        var BGraphs = [];
+
+        var Alabels = [];
+        var Aedges = [];
+
+        var Blabels = [];
+        var Bedges = [];
+
+        var roots = [];
+
+        var done = false;
+
+        //Step through the proof
+        function step(){
+            //If the graph is not ready, generate it.  This is the first step
+            if(!graphReady){
+                generateLabelsAndEdgesFromFormDraw();
+                return;
+            }
+
+            //Display the graph before the last node is removed
+            updateGraphInfo();
+            drawGraph();
+            var lastNode = labels[labels.length - 1];
+
+            //We need to find a NEW node
+            //So we loop until the node is not in the roots array
+            //If we reach 0, our algorithm is done
+            var i = labels.length - 1;
+            while(roots.includes(lastNode)){
+                lastNode = labels[i];
+                if( i == 0){
+                    done = true;
+                    updateAInfo();
+                    drawA();
+                    updateBInfo();
+                    drawB();
+                    updateGraphInfo();
+                    drawGraph();
+                    return;
+                }
+                i--;
+            }
+            
+            roots.push(lastNode);
+
+            //The lastNode is the most significant node for the A Piles and B Piles
+            //For the anti set, no nodes connect to it
+            //For the clique, all nodes connect to it
+            //We need to calculate the degree of the last node to see if its added to A or B
+            var lastNodeDegree = 0;
+            for (var i = 0; i < edges.length; i++) {
+                if (edges[i][0] == lastNode || edges[i][1] == lastNode) {
+                    lastNodeDegree++;
+                }
+            }
+
+            //all the edges that last node is connected to
+            var lastNodeEdges = edges.filter(edge => edge[0] == lastNode || edge[1] == lastNode);
+
+            //Make an array of all the labels in lastNodeEdges
+            var currentLabels = [];
+            currentLabels.push(lastNode);
+            for (var i = 0; i < lastNodeEdges.length; i++) {
+                if(lastNodeEdges[i][0] == lastNode){
+                    currentLabels.push(lastNodeEdges[i][1]);
+                } else {
+                    currentLabels.push(lastNodeEdges[i][0]);
+                }
+            }
+
+            //One of the piles will contain a graph with at least 1/2 log2n nodes
+            //This is because at most half of the nodes are discarded at each of these steps, so at least log2n steps will occur before the process terminates.
+            //This graph will be in one of the two piles
+            var currentGraph = {    labels: currentLabels,
+                                    edges: lastNodeEdges,
+                                    lastNode: lastNode,
+                                    lastNodeDegree: lastNodeDegree,
+                                    points: []
+                                };
+
+            if(lastNodeDegree > labels.length / 2){
+                //This is the only step in the A Pile - the graph put in the A Pile is the graph with at least 1/2 log2n nodes
+                AGraphs.push(currentGraph);
+
+                //Now we adjust the main graph...
+                //Remove all labels in the main graph that are not in currentGraph.labels
+                labels = currentGraph.labels;
+
+                //Remove all edges that have a label not found in labels
+                var newEdges = [];
+                for( var i = 0; i < edges.length; i++) {
+                    //If both points of the edge are found in labels, add it to newEdges
+                    var currentEdge = edges[i];
+
+                    if (labels.includes(currentEdge[0]) && labels.includes(currentEdge[1])) {
+                        newEdges.push(currentEdge)
+                    }
+                }
+
+                edges = newEdges;
+
+                //Draw the A pile
+                updateAInfo();
+                drawA();
+            } else {
+                BGraphs.push(currentGraph);
+
+                //Change the current graph's edges to contain all the nodes to in the main graph that are not in currentGraph.edges
+                var newEdges = [];
+                for (var i = 0; i < edges.length; i++) {
+                    if(!currentGraph.edges.includes(edges[i])){
+                        newEdges.push(edges[i]);
+                    }
+                }
+                //remove any duplicates
+                currentGraph.edges = newEdges;
+
+                //Set the labels to be those in edges
+                var newLabels = [];
+                for (var i = 0; i < edges.length; i++) {
+                    if(!currentGraph.labels.includes(edges[i][0])){
+                        newLabels.push(edges[i][0]);
+                    }
+                    if(!currentGraph.labels.includes(edges[i][1])){
+                        newLabels.push(edges[i][1]);
+                    }
+                }
+                currentGraph.labels = newLabels;
+
+                //Now we adjust the main graph...
+                //only add the main graphs labels to newLabels if the labels is NOT connected to lastnode
+                var newLabels = [];
+                for (var i = 0; i < labels.length; i++) {
+                    if(!currentGraph.labels.includes(labels[i])){
+                        newLabels.push(labels[i]);
+                    }
+                }
+                labels = newLabels;
+               
+
+                labels = newLabels;
+
+                // Remove any edges that have a label not found in labels
+                var newEdges = [];
+                for( var i = 0; i < edges.length; i++) {
+                    //If both points of the edge are found in labels, add it to newEdges
+                    var currentEdge = edges[i];
+
+                    if (newLabels.includes(currentEdge[0]) && newLabels.includes(currentEdge[1])) {
+                        newEdges.push(currentEdge)
+                    }
+                }
+
+                edges = newEdges;
+   
+                //Draw the B pile
+                updateBInfo();
+                drawB();
+            }
+        }
+
+        //Convert labels to points for drawing.
+        canvas.addEventListener('click', function(event) {
+        //console.log("click");
+        var rect = canvas.getBoundingClientRect();
+        var mouseX = event.clientX - rect.left;
+        var mouseY = event.clientY - rect.top;
+
+
+
+
+        //Used if you would like to draw you own graph
+
+        if(connectVertices){
+            for (const point of points) {
+                if (isPointClicked(mouseX, mouseY, point)) {
+
+                    selectedLabels.push(point.label);
+                    //console.log("selectedLabels: " + selectedLabels);
+
+                    if(selectedLabels.length == 2){
+                        var newEdge = [selectedLabels[0], selectedLabels[1]];
+                        edges.push(newEdge);
+                        selectedLabels = [];
+                        //console.log("edges: " + edges);
+                    }
+                    graphReady = true;
+                    updateGraphInfo();
+                    drawGraph();
+                
+                }
+            }
+        }
+
+        if(freeDraw){
+            //console.log("freeDraw");
+
+            var newClick = { x: mouseX, 
+                            y: mouseY };
+            clicks.push(newClick);
+
+            labels = [];
+            for( var i = 0; i < clicks.length; i++){
+                labels.push(i.toString());
+                }
+            
+            graphReady = true;
+            drawGraph();
+            updateGraphInfo();
+        } else if (graphReady){
+            //console.log("draw");
+            var rect = canvas.getBoundingClientRect();
+
+            var newClick = { x: mouseX, 
+                            y: mouseY };
+            clicks.push(newClick);
+            drawGraph();
+        }
+    });
+
+
+    
+    function isPointClicked(mouseX, mouseY, point) {
+        var distance = Math.sqrt((mouseX - point.x) ** 2 + (mouseY - point.y) ** 2);
+        return distance <= 30; // Radius of the circle
+    }
+
+    function drawVertices(){
+        toggleFreeDrawButton();
+        //drawGraph();
+    }
+
+    function toggleFreeDrawButton(){
+        var button = document.getElementById("freeDrawButton");
+
+        if(connectVertices){
+            toggleConnectVerticesButton();
+        }
+
+
+        if(freeDraw){
+            button.classList.remove("buttonOn");
+        } else {
+            button.classList.add("buttonOn");
+        }
+
+        freeDraw = !freeDraw;
+
+
+    }
+
+    function connectVerticesButton(){
+
+        if(freeDraw){
+            toggleFreeDrawButton();
+        }
+
+        toggleConnectVerticesButton();
+
+    }
+
+    function toggleConnectVerticesButton(){
+        var button = document.getElementById("connectVerticesButton");
+        if(connectVertices){
+            button.classList.remove("buttonOn");
+        } else {
+            button.classList.add("buttonOn");
+        }
+
+        connectVertices = !connectVertices;
+    }
+
+
+    function generateGraphFromForm(){
+
+        var labelInput = document.getElementById("labelInput").value;
+        var edgeInput = document.getElementById("edgeInput").value;
+
+        labels = labelInput.split(",");
+        edges = edgeInput.split(";");
+
+        edges = edges.map(edge => edge.split(","));
+
+        drawGraph();
+        updateGraphInfo();
+        
+        //Enable drawing the graph
+        graphReady = true;
+    }
+
+    //construct labels
+    function generateLabelsAndEdgesFromForm(){
+        var numLabels = document.getElementById("numLabels").valueAsNumber || 1;
+        var numEdges = document.getElementById("numEdges").valueAsNumber || 1;
+
+        labels = [];
+        edges = [];
+        clicks = [];
+        points = [];
+
+        for (var i = 1; i <= numLabels; i++) {
+            labels.push(i.toString());
+        }
+
+
+        //construct edges
+        for (var i = 0; i < numEdges; i++) {
+            var edge = [];
+            do {
+                //An edge cannot connect to itself
+                edge[0] = labels[Math.floor(Math.random() * numLabels)];
+                edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                while (edge[0] == edge[1]) {
+                    edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                }
+
+            } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
+            edges.push(edge);
+        }
+
+        drawGraph();
+        updateGraphInfo();
+
+        graphReady = true;
+    }
+
+        //construct labels
+        function generateLabelsAndEdgesFromFormDraw(){
+        var numLabels = document.getElementById("numLabels").valueAsNumber || 1;
+        var numEdges = document.getElementById("numEdges").valueAsNumber || 1;
+
+        labels = [];
+        edges = [];
+        clicks = [];
+        points = [];
+
+        for (var i = 1; i <= numLabels; i++) {
+            labels.push(i.toString());
+        }
+
+
+        //construct edges
+        for (var i = 0; i < numEdges; i++) {
+            var edge = [];
+            do {
+                //An edge cannot connect to itself
+                edge[0] = labels[Math.floor(Math.random() * numLabels)];
+                edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                while (edge[0] == edge[1]) {
+                    edge[1] = labels[Math.floor(Math.random() * numLabels)];
+                }
+
+            } while (edges.some(e => e[0] == edge[0] && e[1] == edge[1]) || edges.some(e => e[0] == edge[1] && e[1] == edge[0]));
+            edges.push(edge);
+        }
+
+        drawGraph();
+        updateGraphInfo();
+
+        autoDraw();
+
+        graphReady = true;
+    }
+
+    //Automatically draw the points
+    //Select points on the canvas randomly, checkin for overlap
+    function autoDraw(){
+        resetDraw();
+        labels.forEach(function(label){
+            var newClick;
+            do {
+                newClick = {    x: Math.random() * (canvas.width - 30) + 15, 
+                                y: Math.random() * (canvas.height - 30) + 15, 
+                            };
+            } while (clicks.some(click => overlap(click, newClick)));
+
+            clicks.push(newClick);
+
+        });
+
+        
+        drawGraph();
+
+        graphReady = false;
+    }
+
+
+    //Remove redundant edges, e.g. 1,2 should only appear once
+    //i.e. remove duplicates from the edge array
+    function simplifyEdges(){
+        var newEdges = [];
+
+        for (let i = 0; i < edges.length; i++){
+            var edge = edges[i];
+
+            for (let j = 0; j < newEdges.length; j ++) {
+                if(newEdges[j][0] == edge[0] && newEdges[j][1] == edge[1]){
+                    //console.log("duplicate edge: " + edge);
+                    edge = null;
+                    break;
+                }
+            }
+            if (edge != null){
+                newEdges.push(edge);
+            }
+            
+        }
+        edges = newEdges;
+
+        drawGraph();
+        updateGraphInfo();
+    }
+
+    function resetDraw(){
+        clicks = [];
+        drawGraph();
+
+        graphReady = true;
+    }
+
+    function resetGraph(){
+        labels = [];
+        edges = [];
+        clicks = [];
+        points = [];
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        updateGraphInfo();
+
+        graphReady = false;
+    }
+
+
+
+
+
+    //Calculate the sum of the degrees of the graph
+    function sumOfDegrees() {
+        var sum = 0;
+        for (var i = 0; i < points.length; i++) {
+            var degree = 0;
+            for (var j = 0; j < edges.length; j++) {
+                if (edges[j][0] == points[i].label || edges[j][1] == points[i].label) {
+                    degree++;
+                }
+            }
+            sum += degree;
+        }
+        return sum;
+    }
+
+    // Draw points with labels
+    function drawPoint(point) {
+
+
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 15, 0, 2 * Math.PI);
+
+        //Get the list of labels in the A pile
+        var ALab = [];
+        for (var i = 0; i < AGraphs.length; i++) {
+            ALab.push(AGraphs[i].lastNode);
+        }
+
+        //Get the list of labels in the B pile
+        var BLab = [];
+        for (var i = 0; i < BGraphs.length; i++) {
+            BLab.push(BGraphs[i].lastNode);
+        }
+
+
+        //If the point is in the A pile, color it blue
+        if(ALab.includes(point.label)){
+            ctx.fillStyle = "blue";
+            ctx.fill();
+        } else if(BLab.includes(point.label)){
+            ctx.fillStyle = "red";
+            ctx.fill();
+        } else {
+            ctx.fillStyle = "white";
+            ctx.fill();
+        }
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+
+        if(selectedLabels.includes(point.label)){
+            ctx.fillStyle = "green";
+            ctx.fill();
+        }
+        ctx.closePath();
+
+
+
+        ctx.font = "12px Arial";
+
+        if(ALab.includes(point.label)){
+            ctx.fillStyle = "white";
+        } else {
+            ctx.fillStyle = "black";
+        }
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(point.label, point.x, point.y);
+    }
+
+        //Draw a line with an array
+    function drawLine(point1, point2) {
+
+        var angle = Math.atan2(point2.y - point1.y, point2.x - point1.x);
+
+
+        var length = Math.sqrt((point1.x - point2.x)**2 + (point1.y - point2.y)**2);
+        var ratio = (length - 15)  / length; //adjust fro 30px space
+
+        // calculate the starting point at the dge of the circle
+        var startPointX = point1.x + 15 * Math.cos(angle);
+        var startPointY = point1.y + 15 * Math.sin(angle);
+
+        var endPointX = point1.x + (point2.x - point1.x) * ratio;
+        var endPointY = point1.y + (point2.y - point1.y) * ratio;
+
+        ctx.beginPath();
+        ctx.moveTo(startPointX, startPointY);
+        ctx.lineTo(endPointX, endPointY);
+
+        ctx.strokeStyle = "black";
+        
+        ctx.stroke();
+        ctx.closePath();
+        //Draw arrow
+        var arrowSize = 15;
+        ctx.beginPath();
+        ctx.moveTo(endPointX, endPointY);
+        ctx.lineTo(endPointX - arrowSize * Math.cos(angle - Math.PI / 6), endPointY - arrowSize * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(endPointX, endPointY);
+        ctx.lineTo(endPointX - arrowSize * Math.cos(angle + Math.PI / 6), endPointY - arrowSize * Math.sin(angle + Math.PI / 6));
+
+        //If the edge is in the red subpath, color it red
+
+        ctx.strokeStyle = "black";
+        
+        ctx.stroke();
+        ctx.closePath();
+    }
+
+    function findPoint(label) {
+        return points.find(point => point.label == label);
+    }
+
+    // Function to check if two points overlap
+    // We loop until this is true
+    function overlap(point1, point2) {
+        var dx = point1.x - point2.x;
+        var dy = point1.y - point2.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < 30;
+    }
+
+    function drawGraph() {      
+        
+        //Reset the points on each draw because there may be new clicks
+        points = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (var i = 0; i < labels.length; i++) {
+            var clickLocation;
+            if(clicks[i] != null){
+                clickLocation = clicks[i];
+            } else {
+                clickLocation = { x: canvas.width - 30, 
+                                y: canvas.height - 30 }
+            }
+
+            newPoint = {    x: clickLocation.x, 
+                            y: clickLocation.y, 
+                            label: labels[i] 
+                        };
+            points.push(newPoint);
+        }
+
+
+
+        for (var i = 0; i < points.length - 1; i++) {
+            drawPoint(points[i]);
+        }
+        // Draw the last point
+        drawPoint(points[points.length - 1]);
+
+        for (var i = 0; i < edges.length; i++) {
+            var point1 = findPoint(edges[i][0]);
+            var point2 = findPoint(edges[i][1]);
+            drawLine(point1, point2);
+        }
+
+        matrixForm();
+    }
+
+    // Function to update the graph information text box
+    function updateGraphInfo() {
+        var graphInfo = document.getElementById("graphInfo");
+
+        var edgePairs = [];
+        for (var i = 0; i < edges.length; i++) {
+            edgePairs.push("(" + edges[i][0] + ", " + edges[i][1] + ")");
+        }
+
+        //console.log("Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }");
+        graphInfo.innerHTML = "Graph: { " + labels + " }, { " + edgePairs.join(", ") + " }";
+
+        var numNodes = labels.length;
+        graphInfo.innerHTML += "<br>Number of nodes: " + numNodes;
+
+        //calculate 1/2 log(base 2) of the number of nodes
+        var log = Math.log2(numNodes);
+        var halfLog = log / 2;
+        graphInfo.innerHTML += "<br>1/2 log<sub>2</sub>(n) = " + halfLog;
+
+        //take the floor of the log
+        var numNodes = Math.floor(log);
+
+        graphInfo.innerHTML += "<br>There exists either a clique or an anti-clique with at least " + numNodes + " nodes.  Proof: <br></br>";
+
+        if( done == true) {
+            graphInfo.innerHTML += "<br>At each step added at least one node to either A (blue) or B (red).  Thus we have gone through at least log<sub>2</sub>n steps. Each steps adds at least one node to the A or B pile, so one of the piles ends up with 1/2 log2n nodes<br></br>";
+        } 
+
+    }
+
+    var matrixValues = [];
+    //Ex matrix form
+    // [Log] ["0", "0", "1", "1", "1", "1", "1", "1"] (8) (subPaths.HTML, line 517)
+    // [Log] ["1", "0", "0", "1", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
+    // [Log] ["2", "0", "0", "0", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
+    // [Log] ["3", "0", "0", "0", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
+    // [Log] ["4", "0", "0", "0", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
+    // [Log] ["5", "0", "0", "0", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
+    // [Log] ["6", "0", "0", "0", "0", "0", "0", "0"] (8) (subPaths.HTML, line 517)
+    function matrixForm(){
+        var matrix = document.getElementById("graphMatrix");
+
+        var matrixString = "Main graph";
+
+            
+        matrixString += "<br>";
+
+        //Add a header row
+        var headerRow = [];
+        for (var i = 0; i < labels.length; i++){
+            headerRow.push(labels[i] % 10);
+        }
+        matrixString += "_ ";
+        matrixString += headerRow.join(" ") + "<br>";
+
+
+        for (var i = 0; i < labels.length; i++){
+            var row = [];
+            for (var j = 0; j < labels.length; j++){
+                var edge = edges.find(edge => edge[0] == labels[i] && edge[1] == labels[j]);
+                //add row label
+                if(j == 0){
+                    row.push(labels[i] % 10);
+                }
+
+                if(edge != null){
+                    row.push("1");
+                } else {
+                    row.push("0");
+                }
+            }
+            matrixString += row.join(" ") + "<br>";
+        }
+
+        matrix.innerHTML = matrixString;
+        //add vertex labels
+        matrix.innerHTML += "<br>";
+
+        //Add the graph to the matrixValues array
+        for (var i = 0; i < labels.length; i++){
+            var row = [];
+            for (var j = 0; j < labels.length; j++){
+                var edge = edges.find(edge => edge[0] == labels[i] && edge[1] == labels[j]);
+                //add row label
+
+                if(edge != null){
+                    row.push("1");
+                } else {
+                    row.push("0");
+                }
+            }
+            matrixValues.push(row);
+        }
+
+
+        //print the matrix values
+        for (var i = 0; i < matrixValues.length; i++){
+            // console.log(matrixValues[i]);
+        }
+       
+
+    }
+
+    function updateAInfo(){
+        var AInfo = document.getElementById("AInfo");
+
+        //For each graph in AGraphs, add the label to a string
+        var AlabelsStr = "";
+        for (var i = 0; i < AGraphs.length; i++){
+            AlabelsStr += AGraphs[i].lastNode;
+            if(i != AGraphs.length - 1){
+                AlabelsStr += ", ";
+            }
+        }
+
+        var AString = "A: { " + AlabelsStr + " }";
+
+        AInfo.innerHTML = AString;
+    }
+
+    function updateBInfo(){
+        var BInfo = document.getElementById("BInfo");
+
+        //For each graph in AGraphs, add the label to a string
+        var BlabelsStr = "";
+        for (var i = 0; i < BGraphs.length; i++){
+            BlabelsStr += BGraphs[i].lastNode;
+            if(i != BGraphs.length - 1){
+                BlabelsStr += ", ";
+            }
+        }
+
+
+        var BString = "B: { " + BlabelsStr + " }";
+
+        BInfo.innerHTML = BString;
+    }
+    
+    function drawA(){
+        //draw each graph in AGraphs
+        var Actx = ACanvas.getContext("2d");
+        Actx.clearRect(0, 0, ACanvas.width, ACanvas.height);
+        for (var i = 0; i < AGraphs.length; i++){
+            drawAGraph(AGraphs[i]);
+        }
+
+    }
+
+    function drawAGraph(graph){
+        var Actx = ACanvas.getContext("2d");
+        Actx.beginPath
+        //draw a point for each label in edges
+        //print the size of the graph
+
+        //Reset the graphs points on the canvas
+        graph.points = [];
+
+        //pick an initial point to draw close to
+        var refPoint = {   x: Math.random() * (ACanvas.width - 30) + 15, 
+                        y: Math.random() * (ACanvas.height - 30) + 15, 
+                        label: graph.lastNode 
+                    };
+
+        
+        for (var i = 0; i < graph.labels.length; i++){
+            var label = graph.labels[i];
+
+            //make a point within 50 px of the refPoint
+            var newPoint;
+            do {
+                newPoint = {    x: Math.random() * (ACanvas.width - 30) + 15, 
+                                y: Math.random() * (ACanvas.height - 30) + 15, 
+                                label: label 
+                            };
+            } while (overlapSmall(refPoint, newPoint));
+
+
+            graph.points.push(newPoint);
+
+            drawAPoint(newPoint);
+
+        }
+
+        connectEdgesA(graph);
+
+
+        //find the lastNode point in graph.points and draw it last so it ins't obscured
+        var lastNodePoint = graph.points.find(point => point.label == graph.lastNode);
+        drawAPoint(lastNodePoint);
+
+    }
+
+    //We loop until this is false
+    function overlapSmall(point1, point2) {
+        var dx = point1.x - point2.x;
+        var dy = point1.y - point2.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+
+        return distance > 50;
+    }
+
+    //We loop until this is false
+    function overlapMedium(point1, point2) {
+        var dx = point1.x - point2.x;
+        var dy = point1.y - point2.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+
+        if(overlapMediumLower(point1, point2)){
+            return true;
+        }
+
+        return distance > 60;
+    }
+
+    //used with overlapMedium
+    function overlapMediumLower(point1, point2) {
+        var dx = point1.x - point2.x;
+        var dy = point1.y - point2.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+
+        return distance < 50;
+    }
+
+
+    function connectEdgesA(graph){
+
+        for (var i = 0; i < graph.edges.length; i++){
+            var edge = graph.edges[i];
+
+            var point1 = graph.points.find(point => point.label == edge[0]);
+            var point2 = graph.points.find(point => point.label == edge[1]);
+
+            drawALine(point1, point2);
+        }
+    }
+
+        function drawALine(point1, point2) {
+            var Actx = ACanvas.getContext("2d");
+            //draw basic line
+            Actx.beginPath();
+            Actx.moveTo(point1.x, point1.y);
+            Actx.lineTo(point2.x, point2.y);
+            Actx.strokeStyle = "black";
+            Actx.stroke();
+            Actx.closePath();
+        }
+
+        function drawAPoint(point) {
+            //Draw the point on A
+            //Get the context for A Canvas
+            var Actx = ACanvas.getContext("2d");
+            //Draw the point
+            Actx.beginPath();
+            Actx.arc(point.x, point.y, 8, 0, 2 * Math.PI);
+            Actx.fillStyle = "blue";
+            Actx.fill();
+
+            //Add the label in text
+            Actx.font = "12px Arial";
+            Actx.fillStyle = "white";
+            Actx.textAlign = "center";
+            Actx.textBaseline = "middle";
+            Actx.fillText(point.label, point.x, point.y);
+
+            Actx.strokeStyle = "black";
+            Actx.stroke();
+            Actx.closePath();
+        }
+
+        function drawB(){
+            //Do the same for B in blue
+
+            var Bctx = BCanvas.getContext("2d");
+            Bctx.clearRect(0, 0, BCanvas.width, BCanvas.height);
+            for (var i = 0; i < BGraphs.length; i++){
+                drawBGraph(BGraphs[i]);
+            }
+
+        }
+
+        function drawBGraph(graph){
+            var Bctx = BCanvas.getContext("2d");
+            Bctx.beginPath
+
+            //Reset the graphs points on the canvas
+            graph.points = [];
+
+            //pick an intiali point to draw close to
+            var refPoint = {   x: Math.random() * (BCanvas.width - 30) + 15, 
+                            y: Math.random() * (BCanvas.height - 30) + 15, 
+                            label: graph.lastNode 
+                        };
+
+            //draw the label in the refPoint
+  
+
+            for (var i = 0; i < graph.labels.length; i++){
+                var label = graph.labels[i];
+
+                //make a point within 50 px of the refPoint
+                var newPoint;
+                do {
+                    newPoint = {    x: Math.random() * (BCanvas.width - 30) + 15, 
+                                    y: Math.random() * (BCanvas.height - 30) + 15, 
+                                    label: label 
+                                };
+                } while (overlapMedium(refPoint, newPoint));
+
+                graph.points.push(newPoint);
+
+                drawBPoint(newPoint);
+            }
+            connectEdgesB(graph);
+
+            drawBPointRef(refPoint);
+            drawBCircle(refPoint);
+
+
+        }
+
+
+        function drawBPoint(point) {
+            //Draw the point on B
+            //Get the context for B Canvas
+            var Bctx = BCanvas.getContext("2d");
+            //Draw the point
+            Bctx.beginPath();
+            Bctx.arc(point.x, point.y, 8, 0, 2 * Math.PI);
+            Bctx.fillStyle = "red";
+            Bctx.fill();
+
+            //Add the label in text
+            Bctx.font = "12px Arial";
+            Bctx.fillStyle = "white";
+            Bctx.textAlign = "center";
+            Bctx.textBaseline = "middle";
+            Bctx.fillText(point.label, point.x, point.y);
+
+            Bctx.strokeStyle = "black";
+            Bctx.stroke();
+            Bctx.closePath();
+        }
+
+        function drawBPointRef(point) {
+            //Draw the point on B
+            //Get the context for B Canvas
+            var Bctx = BCanvas.getContext("2d");
+            //Draw the point
+            Bctx.beginPath();
+            Bctx.arc(point.x, point.y, 7, 0, 2 * Math.PI);
+            Bctx.fillStyle = "red";
+            Bctx.fill();
+
+            //Add the label in text
+            Bctx.font = "12px Arial";
+            Bctx.fillStyle = "white";
+            Bctx.textAlign = "center";
+            Bctx.textBaseline = "middle";
+            Bctx.fillText(point.label, point.x, point.y);
+
+            Bctx.strokeStyle = "black";
+            Bctx.stroke();
+            Bctx.closePath();
+        }
+
+        //Draw a circle around the refPoint
+        function drawBCircle(point) {
+            //Draw the point on B
+            //Get the context for B Canvas
+            var Bctx = BCanvas.getContext("2d");
+            //Draw the point
+            Bctx.beginPath();
+            Bctx.arc(point.x, point.y, 60, 0, 2 * Math.PI);
+            Bctx.strokeStyle = "#ffaaaa";
+            Bctx.stroke();
+            Bctx.closePath();
+        }
+
+
+        function connectEdgesB(graph){
+            for (var i = 0; i < graph.edges.length; i++){
+                var edge = graph.edges[i];
+
+                var point1 = graph.points.find(point => point.label == edge[0]);
+                var point2 = graph.points.find(point => point.label == edge[1]);
+
+                if(point1 != null && point2 != null) {
+                    drawBLine(point1, point2);
+
+                }
+            }
+        }
+
+        function drawBLine(point1, point2) {
+
+            var Bctx = BCanvas.getContext("2d");
+            //draw basic line
+            Bctx.beginPath();
+            Bctx.moveTo(point1.x, point1.y);
+            Bctx.lineTo(point2.x, point2.y);
+            Bctx.strokeStyle = "black";
+            Bctx.stroke();
+            Bctx.closePath();
+        }
+    </script>
+
+</body>
